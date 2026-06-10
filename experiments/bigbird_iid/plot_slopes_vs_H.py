@@ -52,7 +52,7 @@ def plot(results_dir: Path, out_path: Path, theory: bool = True):
     for ax, title in [(ax_m, "Mean error"), (ax_c, "Covariance error")]:
         ax.set_xscale("log"); ax.set_yscale("log")
         ax.axhline(0.5, color="0.6", ls="--", lw=1, alpha=0.8)
-        ax.set_xlabel(r"Horizon $H = \|\Sigma^{1/2}A\|_2$")
+        ax.set_xlabel(r"Horizon $H$")
         ax.set_ylabel(r"$|\beta|$")
         ax.set_title(title)
         ax.legend(loc="best", frameon=False)
