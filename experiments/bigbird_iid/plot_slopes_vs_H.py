@@ -1,5 +1,5 @@
 """Slope-vs-horizon plot: fitted convergence rates `|β_mean|` and `|β_cov|`
-as a function of the per-layer horizon `H = ‖Σ^{1/2}A‖₂`. Every layer found
+as a function of the per-layer horizon H. Every layer found
 under `--results-dir` is plotted; no layers are dropped, no points are starred."""
 from __future__ import annotations
 
