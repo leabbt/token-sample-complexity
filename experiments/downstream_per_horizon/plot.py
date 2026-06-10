@@ -4,8 +4,8 @@ Plot end-to-end error vs n with one curve per H/Lambda_A cluster, fit beta per
 cluster, run Spearman tests, and rank candidate aggregations by separation score.
 
 Inputs (loaded by concatenating shards):
-  results_horizon/H_new_agg{shard}.npy    — (n_ex, num_layers)         two-sided H
-  results_horizon/H_new_heads{shard}.npy  — (n_ex, num_layers, num_heads)
+  results_horizon/H_agg{shard}.npy    — (n_ex, num_layers)         two-sided H
+  results_horizon/H_heads{shard}.npy  — (n_ex, num_layers, num_heads)
   results_horizon/Lambda_A_agg{shard}.npy — (n_ex, num_layers)
   results_horizon/Lambda_A_heads{shard}.npy
   results_window_random/err_pool/err_logit/err_kl/sparse_preds/dense_logits/labels — (n_ex, nb_n, ...)
@@ -13,7 +13,7 @@ Inputs (loaded by concatenating shards):
 
 Output (one figure per (error metric, family) — winners only, NOT per candidate):
   <results_dir>/plots/<metric>__winner.png       (overall winner across families)
-  <results_dir>/plots/<metric>__Hnew_winner.png  (best Hnew candidate for this metric)
+  <results_dir>/plots/<metric>__H_winner.png  (best H candidate for this metric)
   <results_dir>/plots/<metric>__LA_winner.png    (best LA candidate for this metric)
   <results_dir>/plots/separation_summary.csv     (full ranked table, all candidates)
   <results_dir>/plots/spearman_per_n.csv         (rho_s(n) per candidate, metric)
@@ -39,8 +39,7 @@ from scipy.stats import linregress, spearmanr
 C_LOW, C_MID, C_HIGH = "#B81D24", "#D97030", "#FFAB20"
 
 # Fit β only on the linear (power-law) regime — same convention as
-# 01_iid_sparse/plot.py:FIT_N_MAX. The error vs n curve flattens / breaks
-# as n approaches N_MAX=4096, so fitting past ~1000 biases β downward.
+# 01_iid_sparse/plot.py:FIT_N_MAX. 
 FIT_N_MAX_DEFAULT = 884
 
 
@@ -98,15 +97,15 @@ def _family_aggregations(prefix, agg, heads):
     return out
 
 
-def candidate_aggregations(Hnew_agg, Hnew_heads, La_agg, La_heads):
+def candidate_aggregations(H_agg, H_heads, La_agg, La_heads):
     """Return dict candidate_name -> per-example score (n_ex,).
 
     Two families:
-      Hnew_* — two-sided horizon  ||L^T A L||_2 = ||Σ^{1/2} A Σ^{1/2}||_2
+      H_* — two-sided horizon  ||L^T A L||_2 = ||Σ^{1/2} A Σ^{1/2}||_2
       LA_*   — Lambda_A = lambda_max(P_A Σ P_A)
     """
     cands = {}
-    cands.update(_family_aggregations("Hnew", Hnew_agg, Hnew_heads))
+    cands.update(_family_aggregations("H", H_agg, H_heads))
     cands.update(_family_aggregations("LA",   La_agg,   La_heads))
     return cands
 
@@ -136,11 +135,11 @@ def main():
     os.makedirs(plot_dir, exist_ok=True)
 
     print("[Load] Horizon data")
-    Hnew_agg   = concat_shards(args.horizon_dir, "H_new_agg")
-    Hnew_heads = concat_shards(args.horizon_dir, "H_new_heads")
+    H_agg   = concat_shards(args.horizon_dir, "H_agg")
+    H_heads = concat_shards(args.horizon_dir, "H_heads")
     La_agg     = concat_shards(args.horizon_dir, "Lambda_A_agg")
     La_heads   = concat_shards(args.horizon_dir, "Lambda_A_heads")
-    print(f"  H_new_agg {Hnew_agg.shape}  Lambda_A_agg {La_agg.shape}")
+    print(f"  H_agg {H_agg.shape}  Lambda_A_agg {La_agg.shape}")
 
     print("[Load] Window+random data")
     n_values  = np.load(os.path.join(args.window_dir, "n_values.npy"))
@@ -152,8 +151,8 @@ def main():
     print(f"  err_pool {err_pool.shape}  preds {preds.shape}  dense_logits {dense_l.shape}")
 
     n_ex = err_pool.shape[0]
-    assert Hnew_agg.shape[0] >= n_ex, "Need at least n_ex H_new entries"
-    Hnew_agg, Hnew_heads = Hnew_agg[:n_ex], Hnew_heads[:n_ex]
+    assert H_agg.shape[0] >= n_ex, "Need at least n_ex H entries"
+    H_agg, H_heads = H_agg[:n_ex], H_heads[:n_ex]
     La_agg,   La_heads   = La_agg[:n_ex],   La_heads[:n_ex]
 
     dense_pred = dense_l.argmax(axis=1)
@@ -177,11 +176,11 @@ def main():
     n_fit = n_values[fit_mask]
     print(f"[Fit] β fit on {len(n_fit)} points n in {n_fit.tolist()}")
 
-    cands = candidate_aggregations(Hnew_agg, Hnew_heads, La_agg, La_heads)
+    cands = candidate_aggregations(H_agg, H_heads, La_agg, La_heads)
     print(f"[Cands] {len(cands)} candidates: {list(cands.keys())}")
 
     def _family(c):
-        return "Hnew" if c.startswith("Hnew_") else ("LA" if c.startswith("LA_") else "other")
+        return "H" if c.startswith("H_") else ("LA" if c.startswith("LA_") else "other")
 
     def _save_panel(mname, cname, row, curves, betas, fname):
         """One panel per (metric, candidate). Pinned no-intercept fit on the
@@ -240,12 +239,12 @@ def main():
     spearman_rows = []
     winners = {}              # overall best per metric (any family)
     family_winners = {        # best within each family per metric
-        "Hnew": {}, "LA": {},
+        "H": {}, "LA": {},
     }
 
     for mname, err in metrics.items():
         best_overall = None         # (score_tuple, cname, row, curves, betas)
-        best_per_family = {"Hnew": None, "LA": None}
+        best_per_family = {"H": None, "LA": None}
 
         for cname, score in cands.items():
             low, mid, high = tertile_split(score)
@@ -308,7 +307,7 @@ def main():
             winners[mname] = {"candidate": cname, **row}
             _save_panel(mname, cname, row, curves, betas, f"{mname}__winner.png")
 
-        # Per-family winner panels (Hnew, LA). One PNG per (metric, family).
+        # Per-family winner panels (H, LA). One PNG per (metric, family).
         for fam, entry in best_per_family.items():
             if entry is None:
                 continue
