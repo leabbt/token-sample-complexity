@@ -49,7 +49,7 @@ def plot(results_dir: Path, out_path: Path, theory: bool = True):
     ax.axhline(0.5, color="0.6", ls="--", lw=1, alpha=0.8, label=r"$|\beta|=0.5$")
 
     ax.set_xscale("log"); ax.set_yscale("log")
-    ax.set_xlabel(r"Horizon $H = \|\Sigma^{1/2}A\|_2$")
+    ax.set_xlabel(r"Horizon $H$")
     ax.set_ylabel(r"$|\beta|$")
     ax.legend(loc="lower left", frameon=False)
     fig.tight_layout()
