@@ -7,13 +7,9 @@ For each test example and each layer l, with Σ_l = LL^T (Cholesky, L lower tria
   - X_l = hidden states before attention (input to layer l)
   - Σ_l = token covariance of X_l (non-padded tokens only)
   - λ_max(Σ_l), tr(Σ_l)
-  - H_new_l     = ||L^T (Wk^T Wq) L||_2  ( = ||Σ_l^{1/2} A Σ_l^{1/2}||_2 )
+  - H_l     = ||L^T (Wk^T Wq) L||_2  ( = ||Σ_l^{1/2} A Σ_l^{1/2}||_2 )
                   Mirrors experiments/horizons/compute_horizons.py:Horizon_new.
-  - H_new_l^{(h)} per attention head, same two-sided formula on A_h = Wk_h^T Wq_h.
-
-Only the (correct) two-sided horizon is computed here. Prior versions also
-saved a one-sided value via the eigendecomp factor V Λ^{1/2} (without the
-transpose); those `H_agg_shard_*.npy` files are stale and ignored.
+  - H_l^{(h)} per attention head, same two-sided formula on A_h = Wk_h^T Wq_h.
 
 Usage:
     python compute_horizon.py --model results/checkpoint --results-dir results_horizon
@@ -120,7 +116,7 @@ def compute_horizon(cov, Wq, Wk, num_heads=12):
 
     # Aggregated horizon
     A_agg = Wk64.T @ Wq64
-    H_new_agg = torch.linalg.matrix_norm(L.T @ A_agg @ L, ord=2).item()
+    H_agg = torch.linalg.matrix_norm(L.T @ A_agg @ L, ord=2).item()
 
     # Per-head horizons via the cyclic identity. cov_full ≡ L Lᵀ = Σ + εI.
     cov_full = L @ L.T
@@ -131,10 +127,10 @@ def compute_horizon(cov, Wq, Wk, num_heads=12):
     PQ = P_h @ Q_h                                                  # (H, h_d, h_d)
     # PQ is not symmetric in general; take the max |eigenvalue|.
     eigvals = torch.linalg.eigvals(PQ).abs()
-    H_new_heads_t = eigvals.max(dim=-1).values.sqrt()
-    H_new_heads = H_new_heads_t.detach().cpu().numpy().astype(np.float64)
+    H_heads_t = eigvals.max(dim=-1).values.sqrt()
+    H_heads = H_heads_t.detach().cpu().numpy().astype(np.float64)
 
-    return H_new_agg, H_new_heads
+    return H_agg, H_heads
 
 
 def main():
@@ -232,8 +228,8 @@ def main():
              if (args.start_idx > 0 or args.end_idx is not None) else "")
 
     # ── 4. Pre-allocate ──────────────────────────────────────────────────────
-    H_new_agg   = np.zeros((n_ex, num_layers))
-    H_new_heads = np.zeros((n_ex, num_layers, num_heads))
+    H_agg   = np.zeros((n_ex, num_layers))
+    H_heads = np.zeros((n_ex, num_layers, num_heads))
     lam_max     = np.zeros((n_ex, num_layers))
     trace_sig   = np.zeros((n_ex, num_layers))
     actual_lens = np.zeros(n_ex, dtype=int)
@@ -271,11 +267,11 @@ def main():
                 lam_max[j, l] = lm
                 trace_sig[j, l] = tr
 
-                h_new_agg, h_new_heads = compute_horizon(
+                H_agg, H_heads = compute_horizon(
                     cov, Wqs[l], Wks[l], num_heads
                 )
-                H_new_agg[j, l]      = h_new_agg
-                H_new_heads[j, l, :] = h_new_heads
+                H_agg[j, l]      = H_agg
+                H_heads[j, l, :] = H_heads
 
             # Free memory
             del hidden_states, out
@@ -286,8 +282,8 @@ def main():
     # ── 6. Save ──────────────────────────────────────────────────────────────
     print(f"[Step 5] Saving to {args.results_dir}")
 
-    np.save(os.path.join(args.results_dir, f"H_new_agg{shard}.npy"), H_new_agg)
-    np.save(os.path.join(args.results_dir, f"H_new_heads{shard}.npy"), H_new_heads)
+    np.save(os.path.join(args.results_dir, f"H_agg{shard}.npy"), H_agg)
+    np.save(os.path.join(args.results_dir, f"H_heads{shard}.npy"), H_heads)
     np.save(os.path.join(args.results_dir, f"lambda_max{shard}.npy"), lam_max)
     np.save(os.path.join(args.results_dir, f"trace_sigma{shard}.npy"), trace_sig)
     np.save(os.path.join(args.results_dir, f"actual_lens{shard}.npy"), actual_lens)
