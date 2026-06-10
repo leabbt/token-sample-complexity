@@ -1,0 +1,41 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# notebooks
+.ipynb_checkpoints/
+
+# data and outputs (never versioned)
+results/
+data/
+*.npy
+*.npz
+*.pkl
+*.pt
+*.csv
+*.h5
+hf_cache/
+logs/
+
+# the only CSV exception: configs that ship with the repo
+!experiments/**/configs/*.yaml
+!experiments/**/configs/*.yml
+
+# figures are produced by running plot scripts; do not commit
+*.png
+*.pdf
+*.svg
+
+# tests and cluster scripts are local-only; not part of the released repo
+tests/
+slurm/
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/
