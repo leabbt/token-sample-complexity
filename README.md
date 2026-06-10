@@ -143,9 +143,9 @@ jupyter notebook notebooks/tsne_figure.ipynb
 The figure is written to `figures/tsne_subsample_convergence.{png,pdf}`. Set
 `SMOKE_TEST = True` at the top of the notebook for a small local run.
 
-## Horizon convention
+## Horizon computation
 
-The two-sided horizon used throughout is
+The horizon is computed as
 
 ```
 L = cholesky(Σ + 1e-6·I)        # L Lᵀ = Σ + jitter (lower-triangular)
