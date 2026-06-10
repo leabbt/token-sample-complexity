@@ -1,6 +1,5 @@
 """Slope-vs-horizon plot for the window experiment. Three panels (mean, cov, MSE)
-showing the fitted exponent `|β|` versus the per-layer horizon
-`H = ‖Σ^{1/2}A‖₂`. Every layer found under `--results-dir` is included."""
+showing the fitted exponent `|β|` versus the per-layer horizon. Every layer found under `--results-dir` is included."""
 from __future__ import annotations
 
 import argparse
